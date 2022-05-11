@@ -11,12 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
       - name: Run notification script
         env:
+          WISEPAY_THRESHOLD: 10.00
           WISEPAY_MID: ${{ secrets.WISEPAY_MID }}
           WISEPAY_USER: ${{ secrets.WISEPAY_USER }}
           WISEPAY_PASSWORD: ${{ secrets.WISEPAY_PASSWORD }}
