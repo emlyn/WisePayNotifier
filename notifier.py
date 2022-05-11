@@ -95,8 +95,8 @@ def main():
 
     print(message)
 
-    if wp_thresh and wp and wp.balance < wp_thresh:
-        print(f"Skipping notification as balance is not under threshold ({wp_thresh})")
+    if wp_thresh and wp and wp.balance >= wp_thresh:
+        print(f"Skipping notification as balance is not under threshold ({wp_thresh:0.02f})")
     else:
         account_sid = os.getenv('TWILIO_ACCOUNT_SID')
         auth_token = os.getenv('TWILIO_AUTH_TOKEN')
