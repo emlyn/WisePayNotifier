@@ -11,7 +11,7 @@ inputs:
   wisepay_password:
     description: "WisePay password"
     required: true
-  wisepay_threshold:
+  threshold:
     description: "Threshold balance below which notification is sent"
   twilio_account_sid:
     description: "Account SID for accessing Twilio"
@@ -33,4 +33,4 @@ runs:
     TWILIO_AUTH_TOKEN: ${{ inputs.twilio_auth_token }}
   args:
     - ${{ inputs.phone_number }}
-    - ${{ inputs.wisepay_threshold }}
+    - ${{ inputs.threshold }}
