@@ -1,12 +1,9 @@
-FROM alpine:latest
+FROM python:alpine
 
-RUN apk add --update --no-cache python3 && \
-    python3 -m ensurepip
+WORKDIR /app
 
-COPY requirements.txt /requirements.txt
+COPY requirements.txt /app
+RUN pip install --no-cache -r requirements.txt
 
-RUN pip3 install --no-cache --upgrade -r requirements.txt
-
-COPY notifier.py /notifier.py
-
-ENTRYPOINT ["/notifier.py"]
+COPY notifier.py /app
+ENTRYPOINT ["/app/notifier.py"]
