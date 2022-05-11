@@ -67,25 +67,31 @@ def wisepay_state(mid, login, pw):
     parser = WiseParser(r.text)
     return parser
 
+def whatsapp(phone):
+    phone = re.sub('[ ()]', '', phone)
+    phone = re.sub('^00', '+', phone)
+    phone = re.sub('^[+]440', '+44', phone)
+    if re.search(r'^0[1-9]', phone):
+        phone = '+44' + phone[1:]
+    return 'whatsapp:' + phone
+
 def send_notification(account_sid, auth_token, phone_number, message):
     client = Client(account_sid, auth_token)
 
     return client.messages.create(
         body=message,
-        from_='whatsapp:+14155238886',
-        to='whatsapp:' + phone_number)
+        from_=whatsapp('+14155238886'),
+        to=whatsapp(phone_number))
 
-def main():
+def main(phone_number, threshold):
     status = 0
     wp = None
-    wp_thresh = None
     try:
-        wp_mid = os.getenv('WISEPAY_MID')
-        wp_login = os.getenv('WISEPAY_USER')
-        wp_pw = os.getenv('WISEPAY_PASSWORD')
-        wp_thresh = os.getenv('WISEPAY_THRESHOLD')
-        if wp_thresh:
-            wp_thresh = float(wp_thresh)
+        wp_mid = os.getenv('INPUT_WISEPAY_MID')
+        wp_login = os.getenv('INPUT_WISEPAY_USER')
+        wp_pw = os.getenv('INPUT_WISEPAY_PASSWORD')
+        if threshold:
+            threshold = float(threshold)
         wp = wisepay_state(wp_mid, wp_login, wp_pw)
 
         message = f"WisePay balance: £{wp.balance:0.02f} on {wp.date} at {wp.time}"
@@ -95,17 +101,16 @@ def main():
 
     print(message)
 
-    if wp_thresh and wp and wp.balance >= wp_thresh:
-        print(f"Skipping notification as balance is not under threshold ({wp_thresh:0.02f})")
+    if threshold and wp and wp.balance >= threshold:
+        print(f"Skipping notification as balance is not under threshold ({threshold:0.02f})")
     else:
-        account_sid = os.getenv('TWILIO_ACCOUNT_SID')
-        auth_token = os.getenv('TWILIO_AUTH_TOKEN')
-        phone_number = os.getenv('PHONE_NUMBER')
-        result = send_notification(account_sid, auth_token, phone_number, message)
+        tw_account_sid = os.getenv('INPUT_TWILIO_ACCOUNT_SID')
+        tw_auth_token = os.getenv('INPUT_TWILIO_AUTH_TOKEN')
+        result = send_notification(tw_account_sid, tw_auth_token, phone_number, message)
 
         print(f"Twilio result: {result}")
 
     return status
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(main(*sys.argv[1:]))

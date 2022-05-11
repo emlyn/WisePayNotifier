@@ -11,17 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run notification script
-        env:
-          WISEPAY_THRESHOLD: 10.00
-          WISEPAY_MID: ${{ secrets.WISEPAY_MID }}
-          WISEPAY_USER: ${{ secrets.WISEPAY_USER }}
-          WISEPAY_PASSWORD: ${{ secrets.WISEPAY_PASSWORD }}
-          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-          PHONE_NUMBER: ${{ secrets.PHONE_NUMBER }}
-        run: python notifier.py
+      - name: Run notification action
+        uses: ./
+        with:
+          threshold: 10.00
+          phone_number: ${{ secrets.PHONE_NUMBER }}
+          wisepay_mid: ${{ secrets.WISEPAY_MID }}
+          wisepay_login: ${{ secrets.WISEPAY_USER }}
+          wisepay_password: ${{ secrets.WISEPAY_PASSWORD }}
+          twilio_account_sid: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          twilio_auth_token: ${{ secrets.TWILIO_AUTH_TOKEN }}

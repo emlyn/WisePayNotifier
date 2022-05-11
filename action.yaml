@@ -1,0 +1,36 @@
+name: WisePayNotifier
+description: Monitor WisePay meal balance and send WhatsApp message when it's too low
+inputs:
+  wisepay_mid:
+    description: "WisePay mID school identifier"
+    required: true
+    default: 336673
+  wisepay_login:
+    description: "WisePay login name (email address)"
+    required: true
+  wisepay_password:
+    description: "WisePay password"
+    required: true
+  wisepay_threshold:
+    description: "Threshold balance below which notification is sent"
+  twilio_account_sid:
+    description: "Account SID for accessing Twilio"
+    required: true
+  twilio_auth_token:
+    description: "Auth token for accessing Twilio"
+    required: true
+  phone_number:
+    description: "Destination phone number for notification messages"
+    required: true
+runs:
+  using: docker
+  image: Dockerfile
+  env:
+    WISEPAY_MID: ${{ inputs.wisepay_mid }}
+    WISEPAY_LOGIN: ${{ inputs.wisepay_login }}
+    WISEPAY_PASSWORD: ${{ inputs.wisepay_password }}
+    TWILIO_ACCOUNT_SID: ${{ inputs.twilio_account_sid }}
+    TWILIO_AUTH_TOKEN: ${{ inputs.twilio_auth_token }}
+  args:
+    - ${{ inputs.phone_number }}
+    - ${{ inputs.wisepay_threshold }}
