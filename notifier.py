@@ -93,21 +93,21 @@ def wisepay_state(mid, login, pw):
     parser = WiseParser(r.text)
     return parser
 
-def whatsapp(phone):
+def normalise(phone):
     phone = re.sub('[ ()]', '', phone)
     phone = re.sub('^00', '+', phone)
     phone = re.sub('^[+]440', '+44', phone)
     if re.search(r'^0[1-9]', phone):
         phone = '+44' + phone[1:]
-    return 'whatsapp:' + phone
+    return phone
 
-def send_notification(account_sid, auth_token, phone_number, message):
+def send_notification(account_sid, auth_token, ms_sid, phone_number, message):
     client = Client(account_sid, auth_token)
 
     return client.messages.create(
+        messaging_service_sid=ms_sid,
         body=message,
-        from_=whatsapp('+14155238886'),
-        to=whatsapp(phone_number))
+        to=normalise(phone_number))
 
 def main(phone_number, threshold=None):
     status = 0
@@ -133,7 +133,8 @@ def main(phone_number, threshold=None):
     else:
         tw_account_sid = os.getenv('INPUT_TWILIO_ACCOUNT_SID')
         tw_auth_token = os.getenv('INPUT_TWILIO_AUTH_TOKEN')
-        result = send_notification(tw_account_sid, tw_auth_token, phone_number, message)
+        tw_ms_sid = os.getenv('INPUT_TWILIO_MESSAGING_SERVICE_SID')
+        result = send_notification(tw_account_sid, tw_auth_token, tw_ms_sid, phone_number, message)
 
         print(f"Twilio result: {result}")
 
