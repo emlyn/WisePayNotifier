@@ -13,11 +13,15 @@ inputs:
     required: true
   threshold:
     description: "Threshold balance below which notification is sent"
+    default: 10.00
   twilio_account_sid:
     description: "Account SID for accessing Twilio"
     required: true
   twilio_auth_token:
     description: "Auth token for accessing Twilio"
+    required: true
+  twilio_messaging_service_sid:
+    description: "Messaging Service SID for sending SMS messages from Twilio"
     required: true
   phone_number:
     description: "Destination phone number for notification messages"
@@ -31,6 +35,7 @@ runs:
     WISEPAY_PASSWORD: ${{ inputs.wisepay_password }}
     TWILIO_ACCOUNT_SID: ${{ inputs.twilio_account_sid }}
     TWILIO_AUTH_TOKEN: ${{ inputs.twilio_auth_token }}
+    TWILIO_MESSAGING_SERVICE_SID: ${{ inputs.twilio_messaging_service_sid }}
   args:
     - ${{ inputs.phone_number }}
     - ${{ inputs.threshold }}
