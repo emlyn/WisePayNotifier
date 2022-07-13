@@ -94,20 +94,21 @@ def wisepay_state(mid, login, pw):
     return parser
 
 def normalise(phone):
-    phone = re.sub('[ ()]', '', phone)
-    phone = re.sub('^00', '+', phone)
-    phone = re.sub('^[+]440', '+44', phone)
-    if re.search(r'^0[1-9]', phone):
-        phone = '+44' + phone[1:]
+    phone = re.sub('[ ().-]', '', phone)          # Remove common non-digit characters
+    phone = re.sub(r'^00', r'+', phone)           # Replace leading 00 with +
+    phone = re.sub(r'^0([1-9])', r'+44\1', phone) # No international code and looks like UK number: use +44
+    phone = re.sub(r'^\+(44|33)0', r'+\1', phone) # Remove the leading zero from UK/French numbers with international prefix
     return phone
 
 def send_notification(account_sid, auth_token, ms_sid, phone_number, message):
     client = Client(account_sid, auth_token)
+    phone = normalise(phone_number)
+    print(f"Sending notification to {phone} ({phone_number})")
 
     return client.messages.create(
         messaging_service_sid=ms_sid,
         body=message,
-        to=normalise(phone_number))
+        to=phone)
 
 def main(phone_number, threshold=None):
     status = 0
