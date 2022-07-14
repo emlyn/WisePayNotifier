@@ -20,7 +20,7 @@ to be able to send the SMS messages.
    - In the address bar, paste the following: `javascript:alert(document.getElementById('mID').value)`
    - A popup should appear with a number, which is the mID for the school; copy it down.
 1. Add Twilio and WisePay secrets to the repo settings
-1. Create workflow file:
+1. Create workflow file (note that your phone number should be written in "double quotes", otherwise GitHub might interpret it as an actual number and leave off the leading 0 or +):
 
 ```yaml
 name: Notify
@@ -39,7 +39,7 @@ jobs:
         uses: emlyn/WisePayNotifier@v0.0.2
         with:
           threshold: 10.00
-          phone_number: <your phone number>
+          phone_number: "<your phone number>"
           wisepay_mid: <wisepay school ID>
           wisepay_login: <your wisepay login/email address>
           wisepay_password: ${{ secrets.WISEPAY_PASSWORD }}
