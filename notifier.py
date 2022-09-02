@@ -18,6 +18,10 @@ class WiseParser(HTMLParser):
         self._data = []
         self._error = False
         self._errs = []
+        self._accounts = False
+        self._accs = []
+        self._accnum = None
+        self._nextacc = None
         self._date = None
         self._time = None
         self._balance = None
@@ -31,26 +35,54 @@ class WiseParser(HTMLParser):
                     self._data.append('')
                     self._active = True
                     break
+                elif k == 'id' and v == 'my_merged_accounts_panel':
+                    self._accounts = True
+                    self._accs.append(dict(txt=''))
+                    break
         elif tag == 'td':
             for k, v in attrs:
                 if k == 'class' and 'error_form_data' in v.split(' '):
                     self._errs.append('')
                     self._error = True
                     break
+        elif tag == 'a':
+            if self._accounts:
+                for k, v in attrs:
+                    if k == 'href':
+                        self._accs[-1]['url'] = v
+        elif tag == 'br':
+            if self._accounts:
+                self._accs.append(dict(txt=''))
 
     def handle_endtag(self, tag):
         if self._active and tag == 'div':
             self._active = False
         elif self._error and tag == 'td':
             self._error = False
+        elif self._accounts and tag == 'div':
+            self._accounts = False
 
     def handle_data(self, data):
         if self._active:
             self._data[-1] += data
         if self._error:
             self._errs[-1] += data
+        if self._accounts:
+            self._accs[-1]['txt'] += data
 
     def _done(self):
+        for i, a in enumerate(self._accs):
+            txt = a['txt']
+            txt = txt.replace('\xa0', ' ')
+            txt = re.sub(r'^\s*(> )?', r'', txt)
+            if txt.startswith('Switch to '):
+                txt = re.sub(r'^Switch to ', '', txt)
+                if self._accnum is not None and self._nextacc is not None:
+                    self._nextacc = i
+            if txt.endswith(' (active)'):
+                txt = re.sub(r' \(active\)$', '', txt)
+                self._accnum = i
+            a['txt'] = txt
         errtxt = '\n'.join(e.strip()
                            for e in '\n'.join(self._errs).split('\n')
                            if e.strip())
@@ -76,6 +108,10 @@ class WiseParser(HTMLParser):
     @property
     def balance(self):
         return self._balance
+
+    @property
+    def child(self):
+        return self._accs[self._accnum]['txt']
 
 
 def wisepay_state(mid, login, pw):
@@ -103,7 +139,7 @@ def normalise(phone):
 def send_notification(account_sid, auth_token, ms_sid, phone_number, message):
     client = Client(account_sid, auth_token)
     phone = normalise(phone_number)
-    print(f"Sending notification to {phone} ({phone_number})")
+    print(f"Sending notification to {phone} ({phone_number}): {message}")
 
     return client.messages.create(
         messaging_service_sid=ms_sid,
@@ -121,7 +157,7 @@ def main(phone_number, threshold=None):
             threshold = float(threshold)
         wp = wisepay_state(wp_mid, wp_login, wp_pw)
 
-        message = f"WisePay balance: £{wp.balance:0.02f} on {wp.date} at {wp.time}"
+        message = f"WisePay balance for {wp.child}: £{wp.balance:0.02f} on {wp.date} at {wp.time}"
     except Exception as e:
         traceback.print_exc()
         message = f"WisePay error: {e}"
