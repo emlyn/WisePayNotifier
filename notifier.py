@@ -123,7 +123,8 @@ def wisepay_state(mid, login, pw):
         'acc_password': pw
     }
 
-    r = requests.post(url=url, data=data)
+    session = requests.Session()
+    r = session.post(url=url, data=data)
     r.raise_for_status()
 
     parser = WiseParser(r.text)
