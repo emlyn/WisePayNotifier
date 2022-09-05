@@ -18,9 +18,12 @@ class WiseParser(HTMLParser):
         self._data = []
         self._error = False
         self._errs = []
+        self._errortext = None
         self._accounts = False
         self._accs = []
         self._accnum = None
+        self._h5 = False
+        self._accname = None
         self._nextacc = None
         self._date = None
         self._time = None
@@ -53,14 +56,17 @@ class WiseParser(HTMLParser):
         elif tag == 'br':
             if self._accounts:
                 self._accs.append(dict(txt=''))
+        elif tag == 'h5':
+            self._h5 = True
 
     def handle_endtag(self, tag):
-        if self._active and tag == 'div':
+        if tag == 'div':
             self._active = False
-        elif self._error and tag == 'td':
-            self._error = False
-        elif self._accounts and tag == 'div':
             self._accounts = False
+        elif tag == 'td':
+            self._error = False
+        elif tag == 'h5':
+            self._h5 = False
 
     def handle_data(self, data):
         if self._active:
@@ -69,12 +75,21 @@ class WiseParser(HTMLParser):
             self._errs[-1] += data
         if self._accounts:
             self._accs[-1]['txt'] += data
+        if self._h5:
+            self._accname = data
 
     def _done(self):
-        for i, a in enumerate(self._accs):
+        print(f"ACCNM: {self._accname}")
+        if m := re.match(r'.*your account for (.+)', self._accname, re.IGNORECASE):
+            self._accname = m[1]
+        else:
+            self._accname = None
+        for i, a in enumerate(self._accs[:-1]):
+            a['txt'] = re.sub(r'^\s*', '', a['txt'])
+            print(f"ACC {i}: {a}")
             txt = a['txt']
             txt = txt.replace('\xa0', ' ')
-            txt = re.sub(r'^\s*(> )?', r'', txt)
+            txt = re.sub(r'^> ', '', txt)
             if txt.startswith('Switch to '):
                 txt = re.sub(r'^Switch to ', '', txt)
                 if self._accnum is not None and self._nextacc is not None:
@@ -87,23 +102,26 @@ class WiseParser(HTMLParser):
                            for e in '\n'.join(self._errs).split('\n')
                            if e.strip())
         if errtxt:
-            raise Exception(errtxt)
+            self._errortext = errtxt
+            return
         if len(self._data) < 4:
-            raise Exception(f"Unexpected response from WisePay ({len(self._data)} cells)")
+            self._errortext = f"Unexpected response from WisePay ({len(self._data)} cells)"
+            return
         m = self.BALANCE_PATTERN.match(self._data[3])
         if not m:
-            raise Exception(f"Unexpected balance from WisePay: {self._data[3]}")
+            self._errortext = f"Unexpected balance from WisePay: {self._data[3]}"
+            return
         self._date = self._data[1]
         self._time = self._data[2]
         self._balance = float(m.group(1))
 
     @property
     def date(self):
-        return self._date
+        return self._date or '?'
 
     @property
     def time(self):
-        return self._time
+        return self._time or '?'
 
     @property
     def balance(self):
@@ -111,10 +129,32 @@ class WiseParser(HTMLParser):
 
     @property
     def child(self):
-        return self._accs[self._accnum]['txt']
+        if self._accname:
+            return self._accname
+        if not self._accnum:
+            return '?'
+        return self._accs[self._accnum]['txt'] or '?'
+
+    @property
+    def error(self):
+        if self._errortext:
+            return "WisePay error: " + self._errortext
+        elif self._balance is None:
+            return "WisePay error: unknown error fetching balance"
+
+class TwilioMessenger:
+    def __init__(self, account_sid, auth_token, ms_sid, phone):
+        self.account_sid = account_sid
+        self.auth_token = auth_token
+        self.ms_sid = ms_sid
+        self.phone = phone
+
+    def send(self, message):
+        result = send_notification(self.account_sid, self.auth_token, self.ms_sid, self.phone, message)
+        print(f"Twilio result: {result}")
 
 
-def wisepay_state(mid, login, pw):
+def wisepay_scraper(mid, login, pw, threshold, messenger):
     url = 'https://www.wisepay.co.uk/store/parent/process.asp'
     data = {
         'ACT': 'login',
@@ -125,10 +165,25 @@ def wisepay_state(mid, login, pw):
 
     session = requests.Session()
     r = session.post(url=url, data=data)
-    r.raise_for_status()
+    if not r.ok:
+        messenger.send(f"Error connecting to WisePay ({r.status_code}): {r.text}")
+        return 2
 
     parser = WiseParser(r.text)
-    return parser
+
+    if err := parser.error:
+        messenger.send(err)
+        return 3
+
+    message = f"WisePay balance for {parser.child}: £{parser.balance:0.02f} on {parser.date} at {parser.time}"
+    print(message)
+    if threshold and parser.balance >= threshold:
+        print(f"Skipping notification as balance is not under threshold ({threshold:0.02f})")
+        return 0
+
+    result = messenger.send(message)
+
+    return 0
 
 def normalise(phone):
     phone = re.sub('[ ().-]', '', phone)          # Remove common non-digit characters
@@ -140,7 +195,7 @@ def normalise(phone):
 def send_notification(account_sid, auth_token, ms_sid, phone_number, message):
     client = Client(account_sid, auth_token)
     phone = normalise(phone_number)
-    print(f"Sending notification to {phone} ({phone_number}): {message}")
+    print(f"Sending notification to {phone}: {message}")
 
     return client.messages.create(
         messaging_service_sid=ms_sid,
@@ -148,35 +203,22 @@ def send_notification(account_sid, auth_token, ms_sid, phone_number, message):
         to=phone)
 
 def main(phone_number, threshold=None):
-    status = 0
-    wp = None
     try:
+        tw_account_sid = os.getenv('INPUT_TWILIO_ACCOUNT_SID')
+        tw_auth_token = os.getenv('INPUT_TWILIO_AUTH_TOKEN')
+        tw_ms_sid = os.getenv('INPUT_TWILIO_MESSAGING_SERVICE_SID')
+        messenger = TwilioMessenger(tw_account_sid, tw_auth_token, tw_ms_sid, phone_number)
+
         wp_mid = os.getenv('INPUT_WISEPAY_MID')
         wp_login = os.getenv('INPUT_WISEPAY_LOGIN')
         wp_pw = os.getenv('INPUT_WISEPAY_PASSWORD')
         if threshold:
             threshold = float(threshold)
-        wp = wisepay_state(wp_mid, wp_login, wp_pw)
+        return wisepay_scraper(wp_mid, wp_login, wp_pw, threshold, messenger)
 
-        message = f"WisePay balance for {wp.child}: £{wp.balance:0.02f} on {wp.date} at {wp.time}"
     except Exception as e:
         traceback.print_exc()
-        message = f"WisePay error: {e}"
-        status = 1
-
-    print(message)
-
-    if threshold and wp and wp.balance >= threshold:
-        print(f"Skipping notification as balance is not under threshold ({threshold:0.02f})")
-    else:
-        tw_account_sid = os.getenv('INPUT_TWILIO_ACCOUNT_SID')
-        tw_auth_token = os.getenv('INPUT_TWILIO_AUTH_TOKEN')
-        tw_ms_sid = os.getenv('INPUT_TWILIO_MESSAGING_SERVICE_SID')
-        result = send_notification(tw_account_sid, tw_auth_token, tw_ms_sid, phone_number, message)
-
-        print(f"Twilio result: {result}")
-
-    return status
+        return 1
 
 if __name__ == '__main__':
     sys.exit(main(*sys.argv[1:]))
