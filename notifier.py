@@ -7,6 +7,16 @@ import requests
 import traceback
 from html.parser import HTMLParser
 from twilio.rest import Client
+from enum import IntEnum, unique
+from urllib.parse import urljoin
+
+
+@unique
+class Err(IntEnum):
+    OK = 0
+    PARSER_ERROR = 1
+    HTTP_ERROR = 2
+    UNKNOWN_EXCEPTION = 3
 
 
 class WiseParser(HTMLParser):
@@ -136,6 +146,11 @@ class WiseParser(HTMLParser):
         return self._accs[self._accnum]['txt'] or '?'
 
     @property
+    def next_url(self):
+        if self._nextacc and 'url' in self._accs[self._nextacc]:
+            return self._accs[self._nextacc]['url']
+
+    @property
     def error(self):
         if self._errortext:
             return "WisePay error: " + self._errortext
@@ -150,11 +165,21 @@ class TwilioMessenger:
         self.phone = phone
 
     def send(self, message):
-        result = send_notification(self.account_sid, self.auth_token, self.ms_sid, self.phone, message)
+        client = Client(self.account_sid, self.auth_token)
+        phone = normalise(self.phone_number)
+        print(f"Sending notification to {phone}: {message}")
+
+        result = client.messages.create(
+            messaging_service_sid=self.ms_sid,
+            body=message,
+            to=phone)
         print(f"Twilio result: {result}")
 
 
 def wisepay_scraper(mid, login, pw, threshold, messenger):
+    session = requests.Session()
+    result = Err.OK
+
     url = 'https://www.wisepay.co.uk/store/parent/process.asp'
     data = {
         'ACT': 'login',
@@ -163,27 +188,36 @@ def wisepay_scraper(mid, login, pw, threshold, messenger):
         'acc_password': pw
     }
 
-    session = requests.Session()
-    r = session.post(url=url, data=data)
-    if not r.ok:
-        messenger.send(f"Error connecting to WisePay ({r.status_code}): {r.text}")
-        return 2
+    while url:
+        if data:
+            r = session.post(url=url, data=data)
+        else:
+            r = session.get(url)
+        if not r.ok:
+            messenger.send(f"Error connecting to WisePay ({r.status_code}): {r.text}")
+            return Err.HTTP_ERROR
 
-    parser = WiseParser(r.text)
+        parser = WiseParser(r.text)
 
-    if err := parser.error:
-        messenger.send(err)
-        return 3
+        if err := parser.error:
+            messenger.send(err)
+            result = max(result, Err.PARSER_ERROR)
+        else:
+            message = f"WisePay balance for {parser.child}: £{parser.balance:0.02f} on {parser.date} at {parser.time}"
+            print(message)
+            if threshold and parser.balance >= threshold:
+                print(f"Skipping notification as balance is not under threshold (£{threshold:0.02f})")
+            else:
+                messenger.send(message)
 
-    message = f"WisePay balance for {parser.child}: £{parser.balance:0.02f} on {parser.date} at {parser.time}"
-    print(message)
-    if threshold and parser.balance >= threshold:
-        print(f"Skipping notification as balance is not under threshold (£{threshold:0.02f})")
-        return 0
+        data = None
+        if parser.next_url:
+            url = urljoin(url, parser.next_url)
+        else:
+            url = None
 
-    result = messenger.send(message)
+    return result
 
-    return 0
 
 def normalise(phone):
     phone = re.sub('[ ().-]', '', phone)          # Remove common non-digit characters
@@ -192,15 +226,6 @@ def normalise(phone):
     phone = re.sub(r'^\+(44|33)0', r'+\1', phone) # Remove the leading zero from UK/French numbers with international prefix
     return phone
 
-def send_notification(account_sid, auth_token, ms_sid, phone_number, message):
-    client = Client(account_sid, auth_token)
-    phone = normalise(phone_number)
-    print(f"Sending notification to {phone}: {message}")
-
-    return client.messages.create(
-        messaging_service_sid=ms_sid,
-        body=message,
-        to=phone)
 
 def main(phone_number, threshold=None):
     try:
@@ -218,7 +243,8 @@ def main(phone_number, threshold=None):
 
     except Exception as e:
         traceback.print_exc()
-        return 1
+        return Err.UNKNOWN_EXCEPTION
+
 
 if __name__ == '__main__':
-    sys.exit(main(*sys.argv[1:]))
+    sys.exit(main(*sys.argv[1:]).value)
