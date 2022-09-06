@@ -178,7 +178,7 @@ def wisepay_scraper(mid, login, pw, threshold, messenger):
     message = f"WisePay balance for {parser.child}: £{parser.balance:0.02f} on {parser.date} at {parser.time}"
     print(message)
     if threshold and parser.balance >= threshold:
-        print(f"Skipping notification as balance is not under threshold ({threshold:0.02f})")
+        print(f"Skipping notification as balance is not under threshold (£{threshold:0.02f})")
         return 0
 
     result = messenger.send(message)
