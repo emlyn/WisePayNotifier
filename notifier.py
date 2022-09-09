@@ -107,7 +107,7 @@ class WiseParser(HTMLParser):
             txt = re.sub(r'^> ', '', txt)
             if txt.startswith('Switch to '):
                 txt = re.sub(r'^Switch to ', '', txt)
-                if self._accnum is not None and self._nextacc is not None:
+                if self._accnum is not None and self._nextacc is None:
                     self._nextacc = i
             if txt.endswith(' (active)'):
                 txt = re.sub(r' \(active\)$', '', txt)
