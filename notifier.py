@@ -11,6 +11,9 @@ from enum import IntEnum, unique
 from urllib.parse import urljoin
 
 
+DEBUG = False
+
+
 @unique
 class Err(IntEnum):
     OK = 0
@@ -89,14 +92,16 @@ class WiseParser(HTMLParser):
             self._accname = data
 
     def _done(self):
-        print(f"ACCNM: {self._accname}")
+        if DEBUG:
+            print(f"ACCNM: {self._accname}")
         if m := re.match(r'.*your account for (.+)', self._accname, re.IGNORECASE):
             self._accname = m[1]
         else:
             self._accname = None
         for i, a in enumerate(self._accs[:-1]):
             a['txt'] = re.sub(r'^\s*', '', a['txt'])
-            print(f"ACC {i}: {a}")
+            if DEBUG:
+                print(f"ACC {i}: {a}")
             txt = a['txt']
             txt = txt.replace('\xa0', ' ')
             txt = re.sub(r'^> ', '', txt)
@@ -229,6 +234,9 @@ def normalise(phone):
 
 def main(phone_number, threshold=None):
     try:
+        global DEBUG
+        DEBUG = os.getenv('DEBUG', '').lower() in ['yes', 'on', 'true', '1']
+
         tw_account_sid = os.getenv('INPUT_TWILIO_ACCOUNT_SID')
         tw_auth_token = os.getenv('INPUT_TWILIO_AUTH_TOKEN')
         tw_ms_sid = os.getenv('INPUT_TWILIO_MESSAGING_SERVICE_SID')
