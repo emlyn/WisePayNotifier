@@ -169,9 +169,16 @@ class TwilioMessenger:
         self.ms_sid = ms_sid
         self.phone = phone
 
+    def normalise(self, phone):
+        phone = re.sub('[ ().-]', '', phone)          # Remove common non-digit characters
+        phone = re.sub(r'^00', r'+', phone)           # Replace leading 00 with +
+        phone = re.sub(r'^0([1-9])', r'+44\1', phone) # No international code and looks like UK number: use +44
+        phone = re.sub(r'^\+(44|33)0', r'+\1', phone) # Remove the leading zero from UK/French numbers with international prefix
+        return phone
+
     def send(self, message):
         client = Client(self.account_sid, self.auth_token)
-        phone = normalise(self.phone_number)
+        phone = self.normalise(self.phone)
         print(f"Sending notification to {phone}: {message}")
 
         result = client.messages.create(
@@ -222,14 +229,6 @@ def wisepay_scraper(mid, login, pw, threshold, messenger):
             url = None
 
     return result
-
-
-def normalise(phone):
-    phone = re.sub('[ ().-]', '', phone)          # Remove common non-digit characters
-    phone = re.sub(r'^00', r'+', phone)           # Replace leading 00 with +
-    phone = re.sub(r'^0([1-9])', r'+44\1', phone) # No international code and looks like UK number: use +44
-    phone = re.sub(r'^\+(44|33)0', r'+\1', phone) # Remove the leading zero from UK/French numbers with international prefix
-    return phone
 
 
 def main(phone_number, threshold=None):
