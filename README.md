@@ -27,7 +27,7 @@ name: Notify
 
 on:
   schedule:
-    - cron: '0 9 * * Mon-Fri'  # every weekday at 9am UTC
+    - cron: '0 17 * * Mon-Fri'  # every weekday at 5 pm UTC
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
