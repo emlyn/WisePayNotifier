@@ -163,10 +163,11 @@ class WiseParser(HTMLParser):
             return "WisePay error: unknown error fetching balance"
 
 class TwilioMessenger:
-    def __init__(self, account_sid, auth_token, ms_sid, phone):
+    def __init__(self, account_sid, auth_token, ms_sid, sender, phone=None):
         self.account_sid = account_sid
         self.auth_token = auth_token
         self.ms_sid = ms_sid
+        self.sender = sender or None
         self.phone = phone
 
     def normalise(self, phone):
@@ -176,14 +177,15 @@ class TwilioMessenger:
         phone = re.sub(r'^\+(44|33)0', r'+\1', phone) # Remove the leading zero from UK/French numbers with international prefix
         return phone
 
-    def send(self, message):
+    def send(self, message, to=None):
         client = Client(self.account_sid, self.auth_token)
-        phone = self.normalise(self.phone)
+        phone = self.normalise(to or self.phone)
         print(f"Sending notification to {phone}: {message}")
 
         result = client.messages.create(
             messaging_service_sid=self.ms_sid,
             body=message,
+            from_=self.sender,
             to=phone)
         print(f"Twilio result: {result}")
 
@@ -239,7 +241,8 @@ def main(phone_number, threshold=None):
         tw_account_sid = os.getenv('INPUT_TWILIO_ACCOUNT_SID')
         tw_auth_token = os.getenv('INPUT_TWILIO_AUTH_TOKEN')
         tw_ms_sid = os.getenv('INPUT_TWILIO_MESSAGING_SERVICE_SID')
-        messenger = TwilioMessenger(tw_account_sid, tw_auth_token, tw_ms_sid, phone_number)
+        tw_sender = os.getenv('INPUT_TWILIO_SENDER')
+        messenger = TwilioMessenger(tw_account_sid, tw_auth_token, tw_ms_sid, tw_sender, phone_number)
 
         wp_mid = os.getenv('INPUT_WISEPAY_MID')
         wp_login = os.getenv('INPUT_WISEPAY_LOGIN')

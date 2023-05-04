@@ -23,6 +23,10 @@ inputs:
   twilio_messaging_service_sid:
     description: "Messaging Service SID for sending SMS messages from Twilio"
     required: true
+  twilio_sender:
+    description: "Sender number or short code for sending SMS messages"
+    required: false
+    default: WisePayNotifier
   phone_number:
     description: "Destination phone number for notification messages"
     required: true
@@ -36,6 +40,7 @@ runs:
     TWILIO_ACCOUNT_SID: ${{ inputs.twilio_account_sid }}
     TWILIO_AUTH_TOKEN: ${{ inputs.twilio_auth_token }}
     TWILIO_MESSAGING_SERVICE_SID: ${{ inputs.twilio_messaging_service_sid }}
+    TWILIO_SENDER: ${{ inputs.twilio_sender }}
   args:
     - ${{ inputs.phone_number }}
     - ${{ inputs.threshold }}

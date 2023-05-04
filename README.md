@@ -46,4 +46,5 @@ jobs:
           twilio_account_sid: ${{ secrets.TWILIO_ACCOUNT_SID }}
           twilio_auth_token: ${{ secrets.TWILIO_AUTH_TOKEN }}
           twilio_messaging_service_sid: ${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}
+          twilio_sender: "WisePayNotifier"
 ```
