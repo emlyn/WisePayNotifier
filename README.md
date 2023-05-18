@@ -9,11 +9,12 @@ to be able to send the SMS messages.
 
 ## Usage
 
-1. Register for a GitHub account if you don't have one already
-1. Register for a Twilio account if you don't have one already
-1. Add a messaging service to your Twilio account
-1. Create a new private GitHub repository (call it whatever you like)
-1. Find your Twilio account ID and auth token and messaging service SID
+1. Register for a GitHub account if you don't have one already (by clicking the "Sign up" button at the top of the page)
+1. Register for a [Twilio](https://www.twilio.com/) account if you don't have one already
+1. Create a new private GitHub repository
+   - call it whatever you like
+   - make sure it is a private repo, otherwise other people will be able to see your balance
+1. Find your Twilio account ID, auth token, and messaging service SID
 1. Find the WisePay mID for your child's school
    - Go to the WisePay [parent login page](https://www.wisepay.co.uk/store/generic/parent_login.asp)
    - Enter your school name in the input box
