@@ -26,7 +26,6 @@ inputs:
   twilio_sender:
     description: "Sender number or short code for sending SMS messages"
     required: false
-    default: WisePayNotifier
   phone_number:
     description: "Destination phone number for notification messages"
     required: true
