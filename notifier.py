@@ -6,9 +6,13 @@ import sys
 import requests
 import traceback
 from html.parser import HTMLParser
-from twilio.rest import Client
 from enum import IntEnum, unique
 from urllib.parse import urljoin
+
+try:
+    from twilio.rest import Client
+except ImportError:
+    pass
 
 
 DEBUG = False
@@ -19,7 +23,8 @@ class Err(IntEnum):
     OK = 0
     PARSER_ERROR = 1
     HTTP_ERROR = 2
-    UNKNOWN_EXCEPTION = 3
+    NO_MESSENGER = 3
+    UNKNOWN_EXCEPTION = 99
 
 
 class WiseParser(HTMLParser):
@@ -162,13 +167,36 @@ class WiseParser(HTMLParser):
         elif self._balance is None:
             return "WisePay error: unknown error fetching balance"
 
+
+class SimplePushMessenger:
+    def __init__(self, simplepush_key, wp_url=None):
+        self.keys = simplepush_key.split(',')
+        self.url = wp_url
+
+    def send(self, message):
+        print(f"Sending SimplePush notifications")
+        for key in self.keys:
+            requests.post('https://api.simplepush.io/send',
+                          data={'key': key,
+                                'event': 'wisepay',
+                                'title': 'School Meal Balance Low',
+                                'msg': message,
+                                'actions': [{'name': 'WisePay',
+                                             'url': self.url}]})
+
+
 class TwilioMessenger:
+    @staticmethod
+    def available():
+        return Client is not None
+
     def __init__(self, account_sid, auth_token, ms_sid, sender, phone=None):
         self.account_sid = account_sid
         self.auth_token = auth_token
         self.ms_sid = ms_sid
         self.sender = sender or None
         self.phone = phone
+        self.client = Client(self.account_sid, self.auth_token)
 
     def normalise(self, phone):
         phone = re.sub('[ ().-]', '', phone)          # Remove common non-digit characters
@@ -178,11 +206,10 @@ class TwilioMessenger:
         return phone
 
     def send(self, message, to=None):
-        client = Client(self.account_sid, self.auth_token)
         phone = self.normalise(to or self.phone)
         print(f"Sending notification to {phone}: {message}")
 
-        result = client.messages.create(
+        result = self.client.messages.create(
             messaging_service_sid=self.ms_sid,
             body=message,
             from_=self.sender,
@@ -190,7 +217,7 @@ class TwilioMessenger:
         print(f"Twilio result: {result}")
 
 
-def wisepay_scraper(mid, login, pw, threshold, messenger):
+def wisepay_scraper(mid, login, pw, threshold, sender):
     session = requests.Session()
     result = Err.OK
 
@@ -208,13 +235,13 @@ def wisepay_scraper(mid, login, pw, threshold, messenger):
         else:
             r = session.get(url)
         if not r.ok:
-            messenger.send(f"Error connecting to WisePay ({r.status_code}): {r.text}")
+            sender(f"Error connecting to WisePay ({r.status_code}): {r.text}")
             return Err.HTTP_ERROR
 
         parser = WiseParser(r.text)
 
         if err := parser.error:
-            messenger.send(err)
+            sender(err)
             result = max(result, Err.PARSER_ERROR)
         else:
             message = f"WisePay balance for {parser.child}: £{parser.balance:0.02f} on {parser.date} at {parser.time}"
@@ -222,7 +249,7 @@ def wisepay_scraper(mid, login, pw, threshold, messenger):
             if threshold and parser.balance >= threshold:
                 print(f"Skipping notification as balance is not under threshold (£{threshold:0.02f})")
             else:
-                messenger.send(message)
+                sender(message)
 
         data = None
         if parser.next_url:
@@ -238,18 +265,41 @@ def main(phone_number, threshold=None):
         global DEBUG
         DEBUG = os.getenv('DEBUG', '').lower() in ['yes', 'on', 'true', '1']
 
-        tw_account_sid = os.getenv('INPUT_TWILIO_ACCOUNT_SID')
-        tw_auth_token = os.getenv('INPUT_TWILIO_AUTH_TOKEN')
-        tw_ms_sid = os.getenv('INPUT_TWILIO_MESSAGING_SERVICE_SID')
-        tw_sender = os.getenv('INPUT_TWILIO_SENDER')
-        messenger = TwilioMessenger(tw_account_sid, tw_auth_token, tw_ms_sid, tw_sender, phone_number)
-
         wp_mid = os.getenv('INPUT_WISEPAY_MID')
         wp_login = os.getenv('INPUT_WISEPAY_LOGIN')
         wp_pw = os.getenv('INPUT_WISEPAY_PASSWORD')
         if threshold:
             threshold = float(threshold)
-        return wisepay_scraper(wp_mid, wp_login, wp_pw, threshold, messenger)
+
+        wp_url = f'https://www.wisepay.co.uk/store/generic/template.asp?ACT=nav&mID={wp_mid}'
+
+        sp_messenger = None
+        sp_key = os.getenv('INPUT_SIMPLEPUSH_KEY')
+        if sp_key:
+            print("Enabling SimplePush notifications")
+            sp_messenger = SimplePushMessenger(sp_key, wp_url)
+
+        tw_messenger = None
+        if TwilioMessenger.available():
+            tw_account_sid = os.getenv('INPUT_TWILIO_ACCOUNT_SID')
+            tw_auth_token = os.getenv('INPUT_TWILIO_AUTH_TOKEN')
+            tw_ms_sid = os.getenv('INPUT_TWILIO_MESSAGING_SERVICE_SID')
+            tw_sender = os.getenv('INPUT_TWILIO_SENDER')
+            if tw_account_sid and tw_auth_token and tw_ms_sid:
+                print("Enabling Twilio notifications")
+                tw_messenger = TwilioMessenger(tw_account_sid, tw_auth_token, tw_ms_sid, tw_sender, phone_number)
+
+        if not sp_messenger and not tw_messenger:
+            print("No notification method enabled")
+            return Err.NO_MESSENGER
+
+        def sender(msg):
+            if sp_messenger:
+                sp_messenger.send(msg)
+            if tw_messenger:
+                tw_messenger.send(msg)
+
+        return wisepay_scraper(wp_mid, wp_login, wp_pw, threshold, sender)
 
     except Exception as e:
         traceback.print_exc()

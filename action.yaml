@@ -14,21 +14,18 @@ inputs:
   threshold:
     description: "Threshold balance below which notification is sent"
     default: 10.00
+  simplepush_key:
+    description: "Key for sending push notification to SimplePush app"
   twilio_account_sid:
     description: "Account SID for accessing Twilio"
-    required: true
   twilio_auth_token:
     description: "Auth token for accessing Twilio"
-    required: true
   twilio_messaging_service_sid:
     description: "Messaging Service SID for sending SMS messages from Twilio"
-    required: true
   twilio_sender:
     description: "Sender number or short code for sending SMS messages"
-    required: false
   phone_number:
     description: "Destination phone number for notification messages"
-    required: true
 runs:
   using: docker
   image: Dockerfile
@@ -36,6 +33,7 @@ runs:
     WISEPAY_MID: ${{ inputs.wisepay_mid }}
     WISEPAY_LOGIN: ${{ inputs.wisepay_login }}
     WISEPAY_PASSWORD: ${{ inputs.wisepay_password }}
+    SIMPLEPUSH_KEY: ${{ inputs.simplepush_key }}
     TWILIO_ACCOUNT_SID: ${{ inputs.twilio_account_sid }}
     TWILIO_AUTH_TOKEN: ${{ inputs.twilio_auth_token }}
     TWILIO_MESSAGING_SERVICE_SID: ${{ inputs.twilio_messaging_service_sid }}
