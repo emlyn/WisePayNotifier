@@ -28,7 +28,7 @@ class Err(IntEnum):
 
 
 class WiseParser(HTMLParser):
-    BALANCE_PATTERN = re.compile(r'^\s*£?\s*([0-9]*[.][0-9]{0,2})\s*$')
+    BALANCE_PATTERN = re.compile(r'^\s*£?\s*([-]?[0-9]*[.][0-9]{0,2})\s*$')
 
     def __init__(self, txt):
         super().__init__()
