@@ -217,7 +217,7 @@ class TwilioMessenger:
         print(f"Twilio result: {result}")
 
 
-def wisepay_scraper(mid, login, pw, threshold, sender):
+def wisepay_scraper(mid, login, pw, threshold, sender, ignore_names):
     session = requests.Session()
     result = Err.OK
 
@@ -246,7 +246,9 @@ def wisepay_scraper(mid, login, pw, threshold, sender):
         else:
             message = f"WisePay balance for {parser.child}: £{parser.balance:0.02f} on {parser.date} at {parser.time}"
             print(message)
-            if threshold and parser.balance >= threshold:
+            if parser.child.lower().replace('\u00A0', ' ') in ignore_names:
+                print(f"Ignoring {parser.child}")
+            elif threshold and parser.balance >= threshold:
                 print(f"Skipping notification as balance is not under threshold (£{threshold:0.02f})")
             else:
                 sender(message)
@@ -285,6 +287,7 @@ def main(phone_number, threshold=None):
             tw_auth_token = os.getenv('INPUT_TWILIO_AUTH_TOKEN')
             tw_ms_sid = os.getenv('INPUT_TWILIO_MESSAGING_SERVICE_SID')
             tw_sender = os.getenv('INPUT_TWILIO_SENDER')
+            ignore_names = os.getenv('INPUT_IGNORE_NAMES', '').lower().split(',')
             if tw_account_sid and tw_auth_token and tw_ms_sid:
                 print("Enabling Twilio notifications")
                 tw_messenger = TwilioMessenger(tw_account_sid, tw_auth_token, tw_ms_sid, tw_sender, phone_number)
@@ -299,7 +302,7 @@ def main(phone_number, threshold=None):
             if tw_messenger:
                 tw_messenger.send(msg)
 
-        return wisepay_scraper(wp_mid, wp_login, wp_pw, threshold, sender)
+        return wisepay_scraper(wp_mid, wp_login, wp_pw, threshold, sender, ignore_names)
 
     except Exception as e:
         traceback.print_exc()

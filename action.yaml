@@ -14,6 +14,9 @@ inputs:
   threshold:
     description: "Threshold balance below which notification is sent"
     default: 10.00
+  ignore_names:
+    description "Comma separated list of names to ignore (to prevent getting notified about unused accounts)"
+    default: ""
   simplepush_key:
     description: "Key for sending push notification to SimplePush app"
   twilio_account_sid:
