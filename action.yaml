@@ -4,7 +4,7 @@ inputs:
   wisepay_mid:
     description: "WisePay mID school identifier"
     required: true
-    default: 336673
+    default: "336673"
   wisepay_login:
     description: "WisePay login name (email address)"
     required: true
@@ -13,9 +13,9 @@ inputs:
     required: true
   threshold:
     description: "Threshold balance below which notification is sent"
-    default: 10.00
+    default: "10.00"
   ignore_names:
-    description "Comma separated list of names to ignore (to prevent getting notified about unused accounts)"
+    description: "Comma separated list of names to ignore (to prevent getting notified about unused accounts)"
     default: ""
   simplepush_key:
     description: "Key for sending push notification to SimplePush app"
